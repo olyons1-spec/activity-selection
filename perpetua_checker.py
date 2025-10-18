@@ -47,7 +47,7 @@ def get_classes_from_page():
                         classes = json.loads(json_str)
                         classes_data.extend(classes)
                 except:
-                    pass
+                    pass  # Silently ignore parsing errors
 
         page.on('response', handle_response)
 
@@ -55,40 +55,92 @@ def get_classes_from_page():
             # Navigate to timetable page
             page.goto('https://perpetua.ie/timetable', wait_until='domcontentloaded', timeout=60000)
 
-            # Wait for schedule data to load (wait for API responses)
-            page.wait_for_timeout(5000)
+            # Accept cookies
+            try:
+                cookie_btn = page.locator('button:has-text("Allow cookies")').first
+                if cookie_btn.is_visible(timeout=2000):
+                    cookie_btn.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
 
-            # Try to navigate to see more days
-            for i in range(7):  # Check next 7 days
-                try:
-                    # Look for and click the next/forward arrow button
-                    # Common selectors for date navigation
-                    next_selectors = [
-                        'button[aria-label*="next" i]',
-                        'button[aria-label*="forward" i]',
-                        'button:has-text("›")',
-                        'button:has-text("Next")',
-                        '.calendar-next',
-                        '[class*="next"]'
-                    ]
+            # Dismiss promotional popup if it appears
+            try:
+                page.wait_for_timeout(3000)  # Wait for popup to appear
+                no_thanks_btn = page.locator('text="NO, THANKS"').first
+                if no_thanks_btn.is_visible(timeout=2000):
+                    print(f"  Dismissing promotional popup...")
+                    no_thanks_btn.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
 
-                    clicked = False
-                    for selector in next_selectors:
-                        try:
-                            next_btn = page.locator(selector).first
-                            if next_btn.is_visible(timeout=1000):
-                                next_btn.click()
-                                page.wait_for_timeout(2000)  # Wait for new data to load
-                                clicked = True
-                                break
-                        except:
-                            continue
+            # Wait for the Mindbody widget iframe to load
+            print(f"  Waiting for calendar widget to load...")
+            page.wait_for_timeout(8000)
 
-                    if not clicked:
-                        break  # No more navigation possible
+            # Find and access the Mindbody iframe
+            try:
+                iframe_elem = page.wait_for_selector('iframe[src*="mindbody"]', timeout=10000)
+                frame = iframe_elem.content_frame()
 
-                except:
-                    break
+                if frame:
+                    print(f"  Loading full week schedule...")
+                    frame.wait_for_timeout(5000)  # Wait longer for initial load
+
+                    # Try clicking "Full Calendar" button to see all classes
+                    try:
+                        clicked = frame.evaluate('''() => {
+                            const allButtons = Array.from(document.querySelectorAll('button'));
+                            const calBtn = allButtons.find(btn => btn.textContent.trim() === 'Full Calendar');
+                            if (calBtn) {
+                                calBtn.click();
+                                return true;
+                            }
+                            return false;
+                        }''')
+
+                        if clicked:
+                            print(f"  Switched to Full Calendar view")
+                            frame.wait_for_timeout(8000)  # Wait longer for calendar view to load all data
+
+                            # Try navigating forward through weeks to load more data
+                            for week_num in range(2):  # Load 2 more weeks
+                                nav_clicked = frame.evaluate('''() => {
+                                    const allButtons = Array.from(document.querySelectorAll('button'));
+                                    const nextBtn = allButtons.find(btn => {
+                                        const text = btn.textContent.trim();
+                                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                                        return text === '›' || text === '>' ||
+                                               ariaLabel.toLowerCase().includes('next') ||
+                                               ariaLabel.toLowerCase().includes('forward');
+                                    });
+
+                                    if (nextBtn && !nextBtn.disabled) {
+                                        nextBtn.click();
+                                        return true;
+                                    }
+                                    return false;
+                                }''')
+
+                                if nav_clicked:
+                                    print(f"    Loading week {week_num + 2}...")
+                                    frame.wait_for_timeout(4000)
+                                else:
+                                    break
+
+                    except Exception as e:
+                        print(f"  Calendar navigation error: {e}")
+
+                    print(f"  Total classes collected: {len(classes_data)}")
+
+                else:
+                    print(f"  Could not access iframe, collecting today's data only...")
+                    page.wait_for_timeout(5000)
+
+            except Exception as e:
+                print(f"  Could not find widget iframe, collecting today's data only...")
+                page.wait_for_timeout(5000)
 
         except Exception as e:
             # Even if page load times out, we might have captured some data
@@ -166,12 +218,20 @@ def check_perpetua_classes():
         print("Please check your internet connection or try again later.")
         return []
 
+    print(f"  Total classes found: {len(data)}")
+
+    # Show all unique class types found (for debugging)
+    if data:
+        all_types = set(cls.get('name', '') for cls in data)
+        print(f"  Class types in data: {', '.join(sorted(all_types))}")
+
     # Analyze classes
     available_classes = analyze_classes(data)
 
     if not available_classes:
         print("\n" + "="*80)
-        print("No available classes found in your target categories.")
+        print("No RIDE/Performance classes found in the target categories.")
+        print("(These classes may only be scheduled on certain weekdays)")
         print("="*80)
         return []
 
