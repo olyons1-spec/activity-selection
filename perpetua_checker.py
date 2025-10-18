@@ -8,6 +8,7 @@ Runs headless - no browser window will appear.
 
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import re
 import sys
@@ -104,12 +105,14 @@ def analyze_classes(classes_data):
 
         # Check if it's in our target categories (case-insensitive partial match)
         if any(cat.lower() in class_name.lower() for cat in TARGET_CATEGORIES):
-            # Parse the datetime
+            # Parse the datetime and convert to Irish time
             start_time = cls.get('startDateTime', '')
             if start_time:
                 try:
+                    # Parse as UTC and convert to Europe/Dublin timezone
                     dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                    time_str = dt.strftime('%H:%M')
+                    dt_irish = dt.astimezone(ZoneInfo('Europe/Dublin'))
+                    time_str = dt_irish.strftime('%H:%M')
                 except:
                     time_str = start_time
             else:
