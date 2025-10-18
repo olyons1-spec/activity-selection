@@ -13,14 +13,11 @@ import re
 import sys
 
 TARGET_CATEGORIES = [
-    "InBody Analysis",
-    "Oly AM",
     "PERFORMANCE RIDE",
     "Ride",
     "RIDE",
     "RIDE45",
-    "RIDE60",
-    "Rumble"
+    "RIDE60"
 ]
 
 def get_classes_from_page():
@@ -40,14 +37,16 @@ def get_classes_from_page():
             if 'schedule' in response.url and response.request.method == 'POST':
                 try:
                     text = response.text()
-                    # Parse Next.js RSC format response
+
+                    # Try parsing as Next.js RSC format - array of classes
                     match = re.search(r'1:(\[.*?\])\s*$', text, re.DOTALL | re.MULTILINE)
                     if match:
                         json_str = match.group(1)
                         classes = json.loads(json_str)
-                        classes_data.extend(classes)
+                        if classes:  # Only add if not empty
+                            classes_data.extend(classes)
                 except:
-                    pass  # Silently ignore parsing errors
+                    pass  # Silently ignore - not all responses will have class data
 
         page.on('response', handle_response)
 
@@ -55,92 +54,33 @@ def get_classes_from_page():
             # Navigate to timetable page
             page.goto('https://perpetua.ie/timetable', wait_until='domcontentloaded', timeout=60000)
 
-            # Accept cookies
-            try:
-                cookie_btn = page.locator('button:has-text("Allow cookies")').first
-                if cookie_btn.is_visible(timeout=2000):
-                    cookie_btn.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
+            # Wait for page and widget to load
+            page.wait_for_timeout(3000)
 
-            # Dismiss promotional popup if it appears
-            try:
-                page.wait_for_timeout(3000)  # Wait for popup to appear
-                no_thanks_btn = page.locator('text="NO, THANKS"').first
-                if no_thanks_btn.is_visible(timeout=2000):
-                    print(f"  Dismissing promotional popup...")
-                    no_thanks_btn.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
+            # Find the Mindbody widget iframe
+            print(f"  Locating Mindbody widget...")
+            iframe_locator = page.frame_locator("#bw-widget-iframe-b8be0, iframe[src*='mindbody']")
 
-            # Wait for the Mindbody widget iframe to load
-            print(f"  Waiting for calendar widget to load...")
-            page.wait_for_timeout(8000)
+            # Wait for iframe to load
+            page.wait_for_timeout(5000)  # Let initial data load
 
-            # Find and access the Mindbody iframe
-            try:
-                iframe_elem = page.wait_for_selector('iframe[src*="mindbody"]', timeout=10000)
-                frame = iframe_elem.content_frame()
+            print(f"  Classes from initial load: {len(classes_data)}")
 
-                if frame:
-                    print(f"  Loading full week schedule...")
-                    frame.wait_for_timeout(5000)  # Wait longer for initial load
+            # Click through each day of the week to load all classes
+            days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            print(f"  Loading classes for each day of the week...")
 
-                    # Try clicking "Full Calendar" button to see all classes
-                    try:
-                        clicked = frame.evaluate('''() => {
-                            const allButtons = Array.from(document.querySelectorAll('button'));
-                            const calBtn = allButtons.find(btn => btn.textContent.trim() === 'Full Calendar');
-                            if (calBtn) {
-                                calBtn.click();
-                                return true;
-                            }
-                            return false;
-                        }''')
+            for day in days:
+                try:
+                    print(f"    Clicking {day}...")
+                    day_btn = iframe_locator.get_by_role("button", name=day)
+                    day_btn.click(timeout=2000)
+                    page.wait_for_timeout(3500)  # Wait for API response
+                except Exception as e:
+                    print(f"    {day} button not found or not clickable")
+                    continue
 
-                        if clicked:
-                            print(f"  Switched to Full Calendar view")
-                            frame.wait_for_timeout(8000)  # Wait longer for calendar view to load all data
-
-                            # Try navigating forward through weeks to load more data
-                            for week_num in range(2):  # Load 2 more weeks
-                                nav_clicked = frame.evaluate('''() => {
-                                    const allButtons = Array.from(document.querySelectorAll('button'));
-                                    const nextBtn = allButtons.find(btn => {
-                                        const text = btn.textContent.trim();
-                                        const ariaLabel = btn.getAttribute('aria-label') || '';
-                                        return text === '›' || text === '>' ||
-                                               ariaLabel.toLowerCase().includes('next') ||
-                                               ariaLabel.toLowerCase().includes('forward');
-                                    });
-
-                                    if (nextBtn && !nextBtn.disabled) {
-                                        nextBtn.click();
-                                        return true;
-                                    }
-                                    return false;
-                                }''')
-
-                                if nav_clicked:
-                                    print(f"    Loading week {week_num + 2}...")
-                                    frame.wait_for_timeout(4000)
-                                else:
-                                    break
-
-                    except Exception as e:
-                        print(f"  Calendar navigation error: {e}")
-
-                    print(f"  Total classes collected: {len(classes_data)}")
-
-                else:
-                    print(f"  Could not access iframe, collecting today's data only...")
-                    page.wait_for_timeout(5000)
-
-            except Exception as e:
-                print(f"  Could not find widget iframe, collecting today's data only...")
-                page.wait_for_timeout(5000)
+            print(f"  Total classes collected: {len(classes_data)}")
 
         except Exception as e:
             # Even if page load times out, we might have captured some data
