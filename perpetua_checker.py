@@ -65,17 +65,18 @@ def get_classes_from_page():
             print(f"  Classes from initial load: {len(classes_data)}")
 
             # Click through each day of the week to load all classes
+            # All 7 days are visible in the widget, no navigation needed
             days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            print(f"  Loading classes for each day of the week...")
+            print(f"  Loading classes for each day...")
 
             for day in days:
                 try:
                     print(f"    Clicking {day}...")
                     day_btn = iframe_locator.get_by_role("button", name=day)
-                    day_btn.click(timeout=2000)
-                    page.wait_for_timeout(3500)  # Wait for API response
+                    day_btn.click(timeout=5000, force=True)  # Longer timeout, force click if needed
+                    page.wait_for_timeout(4000)  # Wait for API response
                 except Exception as e:
-                    print(f"    {day} button not found or not clickable")
+                    print(f"    {day} not available")
                     continue
 
             print(f"  Total classes collected: {len(classes_data)}")
