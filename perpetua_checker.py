@@ -14,8 +14,6 @@ import sys
 
 TARGET_CATEGORIES = [
     "PERFORMANCE RIDE",
-    "Ride",
-    "RIDE",
     "RIDE45",
     "RIDE60"
 ]
