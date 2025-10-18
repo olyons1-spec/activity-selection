@@ -2,17 +2,15 @@
 Perpetua Fitness Class Availability Checker
 Checks for available classes in specified categories
 
-Uses the Mindbody Online API (via Next.js RSC format) to fetch class schedules.
-No authentication required - public API endpoint.
+Uses Playwright to scrape the Mindbody Online widget on Perpetua's website.
+Runs headless - no browser window will appear.
 """
 
-import requests
-from datetime import datetime, timedelta
+from playwright.sync_api import sync_playwright
+from datetime import datetime
 import json
 import re
-
-# Mindbody Online widget endpoint for Perpetua
-API_URL = "https://brandedweb-next.mindbodyonline.com/components/widgets/schedules/view/7043150014/schedule"
+import sys
 
 TARGET_CATEGORIES = [
     "InBody Analysis",
@@ -25,73 +23,82 @@ TARGET_CATEGORIES = [
     "Rumble"
 ]
 
-def get_classes_for_date(date):
-    """Get scheduled classes for a specific date using the API"""
+def get_classes_from_page():
+    """Scrape class data from Perpetua website using Playwright"""
 
-    # Build date range - today
-    # The API seems to want the date range for a full day
-    from_date = date.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=1)
-    to_date = from_date.replace(hour=23, minute=59, second=59, microsecond=999000)
+    print("  Loading Perpetua timetable...")
 
-    # Format as ISO string with timezone
-    from_date_str = from_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')[:-4] + 'Z'  # .000Z format
-    to_date_str = to_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')[:-4] + 'Z'  # .999Z format
+    with sync_playwright() as p:
+        # Launch browser in headless mode (no window)
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-    # Construct the exact payload format from the browser
-    payload_data = json.dumps([
-        "$@1",
-        {
-            "fromDate": from_date_str,
-            "toDate": to_date_str
-        }
-    ], separators=(',', ':'))
+        classes_data = []
 
-    # Use requests' files parameter for multipart/form-data
-    files = {
-        '0': (None, payload_data, 'application/json')
-    }
+        # Set up response interception to capture the API response
+        def handle_response(response):
+            if 'schedule' in response.url and response.request.method == 'POST':
+                try:
+                    text = response.text()
+                    # Parse Next.js RSC format response
+                    match = re.search(r'1:(\[.*?\])\s*$', text, re.DOTALL | re.MULTILINE)
+                    if match:
+                        json_str = match.group(1)
+                        classes = json.loads(json_str)
+                        classes_data.extend(classes)
+                except:
+                    pass
 
-    headers = {
-        "Accept": "text/x-component",
-        "Next-Action": "a64730d69e8890e8f3a86a82ccf6ac0d82c0fb45",
-        "Origin": "https://perpetua.ie",
-        "Referer": "https://perpetua.ie/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+        page.on('response', handle_response)
 
-    try:
-        response = requests.post(API_URL, headers=headers, files=files, timeout=10)
+        try:
+            # Navigate to timetable page
+            page.goto('https://perpetua.ie/timetable', wait_until='domcontentloaded', timeout=60000)
 
-        if response.status_code == 200:
-            # The response is in Next.js RSC format
-            # Parse the JSON array from the response text
-            text = response.text
+            # Wait for schedule data to load (wait for API responses)
+            page.wait_for_timeout(5000)
 
-            # Find the JSON array in the response (it's embedded in the RSC stream)
-            # Look for pattern like: 1:[{...class data...}]
-            match = re.search(r'1:(\[.*?\])\s*$', text, re.DOTALL | re.MULTILINE)
+            # Try to navigate to see more days
+            for i in range(7):  # Check next 7 days
+                try:
+                    # Look for and click the next/forward arrow button
+                    # Common selectors for date navigation
+                    next_selectors = [
+                        'button[aria-label*="next" i]',
+                        'button[aria-label*="forward" i]',
+                        'button:has-text("›")',
+                        'button:has-text("Next")',
+                        '.calendar-next',
+                        '[class*="next"]'
+                    ]
 
-            if match:
-                json_str = match.group(1)
-                # Parse the JSON
-                classes = json.loads(json_str)
-                return classes
-            else:
-                print(f"  Could not parse RSC response")
-                # Save response for debugging
-                with open('perpetua_debug_response.txt', 'w', encoding='utf-8') as f:
-                    f.write(text)
-                print(f"  Response saved to perpetua_debug_response.txt")
-                return None
-        else:
-            print(f"  HTTP {response.status_code}: {response.text[:200]}")
-            return None
+                    clicked = False
+                    for selector in next_selectors:
+                        try:
+                            next_btn = page.locator(selector).first
+                            if next_btn.is_visible(timeout=1000):
+                                next_btn.click()
+                                page.wait_for_timeout(2000)  # Wait for new data to load
+                                clicked = True
+                                break
+                        except:
+                            continue
 
-    except Exception as e:
-        print(f"  Request failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+                    if not clicked:
+                        break  # No more navigation possible
+
+                except:
+                    break
+
+        except Exception as e:
+            # Even if page load times out, we might have captured some data
+            if not classes_data:
+                print(f"  Error loading page: {e}")
+
+        finally:
+            browser.close()
+
+    return classes_data if classes_data else None
 
 def analyze_classes(classes_data):
     """Extract available classes from API response"""
@@ -151,21 +158,31 @@ def check_perpetua_classes():
         print(f"  - {cat}")
     print()
 
-    # The API returns all classes for the current schedule view
-    # We just need to call it once
-    print("Fetching class schedule...")
-
-    data = get_classes_for_date(datetime.now())
+    # Get classes from the website
+    data = get_classes_from_page()
 
     if not data:
-        print("Failed to fetch class data")
+        print("\nFailed to fetch class data from website.")
+        print("Please check your internet connection or try again later.")
         return []
 
-    # Analyze all classes
+    print(f"  Found {len(data)} total classes")
+
+    # Show all class names for debugging
+    print("\n  All classes found:")
+    for cls in data:
+        bookable = " (BOOKABLE)" if cls.get('bookable') else " (not bookable)"
+        cancelled = " (CANCELLED)" if cls.get('cancelled') else ""
+        spots = f"{cls.get('capacity', 0) - cls.get('numberRegistered', 0)}/{cls.get('capacity', 0)} available"
+        print(f"    - {cls.get('name', 'Unknown')} - {spots}{bookable}{cancelled}")
+
+    # Analyze classes
     available_classes = analyze_classes(data)
 
     if not available_classes:
-        print("\nNo available classes found in your target categories.")
+        print("\n" + "="*80)
+        print("No available classes found in your target categories.")
+        print("="*80)
         return []
 
     # Group by date
@@ -182,7 +199,7 @@ def check_perpetua_classes():
 
     # Display results
     print("\n" + "="*80)
-    print("AVAILABLE CLASSES")
+    print(f"FOUND {len(available_classes)} AVAILABLE CLASS(ES)")
     print("="*80)
 
     for date_key in sorted(classes_by_date.keys()):
@@ -195,8 +212,7 @@ def check_perpetua_classes():
             print(f"  [{cls['time']}] {cls['name']}")
             print(f"      Location: {cls['location']}")
             print(f"      Availability: {cls['available']}/{cls['total']} spots")
-            if cls['available'] > 0:
-                print(f"      >>> BOOKABLE! <<<")
+            print(f"      >>> BOOKABLE! <<<")
 
     return available_classes
 
