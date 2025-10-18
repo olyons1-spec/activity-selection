@@ -166,16 +166,6 @@ def check_perpetua_classes():
         print("Please check your internet connection or try again later.")
         return []
 
-    print(f"  Found {len(data)} total classes")
-
-    # Show all class names for debugging
-    print("\n  All classes found:")
-    for cls in data:
-        bookable = " (BOOKABLE)" if cls.get('bookable') else " (not bookable)"
-        cancelled = " (CANCELLED)" if cls.get('cancelled') else ""
-        spots = f"{cls.get('capacity', 0) - cls.get('numberRegistered', 0)}/{cls.get('capacity', 0)} available"
-        print(f"    - {cls.get('name', 'Unknown')} - {spots}{bookable}{cancelled}")
-
     # Analyze classes
     available_classes = analyze_classes(data)
 
