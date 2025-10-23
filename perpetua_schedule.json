@@ -1,0 +1,84 @@
+{
+  "classes": [
+    {
+      "name": "RIDE45",
+      "time": "07:45",
+      "date": "2025-10-24",
+      "day": "Friday",
+      "available": 12,
+      "total": 26,
+      "location": "Perpetua - Lennox",
+      "start_datetime": "2025-10-24T06:45:00+00:00",
+      "bookable": true,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:45:36.475908"
+    },
+    {
+      "name": "RIDE45",
+      "time": "10:45",
+      "date": "2025-10-25",
+      "day": "Saturday",
+      "available": 17,
+      "total": 26,
+      "location": "Perpetua - Lennox",
+      "start_datetime": "2025-10-25T09:45:00+00:00",
+      "bookable": true,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:53:18.459522"
+    },
+    {
+      "name": "PERFORMANCE RIDE45",
+      "time": "09:00",
+      "date": "2025-10-26",
+      "day": "Sunday",
+      "available": 28,
+      "total": 28,
+      "location": "Perpetua - Windmill",
+      "start_datetime": "2025-10-26T09:00:00+00:00",
+      "bookable": true,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:53:18.459423"
+    },
+    {
+      "name": "RIDE45",
+      "time": "10:00",
+      "date": "2025-10-26",
+      "day": "Sunday",
+      "available": 24,
+      "total": 28,
+      "location": "Perpetua - Windmill",
+      "start_datetime": "2025-10-26T10:00:00+00:00",
+      "bookable": true,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:53:18.459450"
+    },
+    {
+      "name": "RIDE45",
+      "time": "17:45",
+      "date": "2025-10-29",
+      "day": "Wednesday",
+      "available": 28,
+      "total": 28,
+      "location": "Perpetua - Windmill",
+      "start_datetime": "2025-10-29T17:45:00+00:00",
+      "bookable": false,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:53:18.459485"
+    },
+    {
+      "name": "RIDE45",
+      "time": "18:45",
+      "date": "2025-10-29",
+      "day": "Wednesday",
+      "available": 28,
+      "total": 28,
+      "location": "Perpetua - Windmill",
+      "start_datetime": "2025-10-29T18:45:00+00:00",
+      "bookable": false,
+      "cancelled": false,
+      "last_seen": "2025-10-23T12:53:18.459500"
+    }
+  ],
+  "last_updated": "2025-10-23T12:53:18.459532",
+  "notes": "This file accumulates all Perpetua classes seen. New scrapes ADD to this data, never remove."
+}
