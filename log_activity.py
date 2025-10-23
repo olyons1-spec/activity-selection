@@ -4,6 +4,7 @@ Simple CLI tool to log completed activities
 Usage:
   python log_activity.py run                    # Log a run today
   python log_activity.py run yesterday          # Log yesterday's run
+  python log_activity.py cycle                  # Log a cycle today
   python log_activity.py spin                   # Log spin class today
   python log_activity.py sauna                  # Log sauna session
   python log_activity.py climbing               # Log climbing session
@@ -21,6 +22,10 @@ ACTIVITY_CONFIGS = {
     'run': {
         'duration_minutes': 45,
         'location': 'Ringsend Park'
+    },
+    'cycle': {
+        'duration_minutes': 90,
+        'location': 'Phoenix Park Circuit'
     },
     'spin': {
         'duration_minutes': 60,

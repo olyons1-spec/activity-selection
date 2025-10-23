@@ -8,6 +8,7 @@ from sauna_checker import check_sauna_availability
 from climbing_checker import check_climbing_availability
 from recommend_hike import recommend_trails
 from swimming_checker import check_swimming_availability
+from cycling_checker import check_cycling_availability
 from datetime import datetime
 
 def get_all_available_activities():
@@ -23,7 +24,7 @@ def get_all_available_activities():
     activities = []
 
     # 1. Check Running
-    print("[1/6] Checking running availability...")
+    print("[1/7] Checking running availability...")
     try:
         running = check_running_availability()
         if running['available']:
@@ -40,8 +41,26 @@ def get_all_available_activities():
 
     print()
 
-    # 2. Check Spin Classes
-    print("[2/6] Checking Perpetua spin classes (from persistent schedule)...")
+    # 2. Check Cycling
+    print("[2/7] Checking cycling availability...")
+    try:
+        cycling = check_cycling_availability(route_type='medium')
+        if cycling['available']:
+            activities.append({
+                'type': 'Cycling',
+                'available': True,
+                'duration_minutes': cycling['duration_minutes'],
+                'location': cycling['location'],
+                'weather_dependent': True,
+                'details': f"{cycling['route']} - {cycling['rating']}: {cycling['assessment']}"
+            })
+    except Exception as e:
+        print(f"  Error checking cycling: {e}")
+
+    print()
+
+    # 3. Check Spin Classes
+    print("[3/7] Checking Perpetua spin classes (from persistent schedule)...")
     try:
         # Use fast schedule lookup instead of scraping
         today_classes = get_today_classes_from_schedule()
@@ -66,8 +85,8 @@ def get_all_available_activities():
 
     print()
 
-    # 3. Check Climbing
-    print("[3/6] Checking social climbing availability...")
+    # 4. Check Climbing
+    print("[4/7] Checking social climbing availability...")
     try:
         climbing = check_climbing_availability()
         if climbing['available']:
@@ -86,8 +105,8 @@ def get_all_available_activities():
 
     print()
 
-    # 4. Check Sauna
-    print("[4/6] Checking sauna availability...")
+    # 5. Check Sauna
+    print("[5/7] Checking sauna availability...")
     try:
         all_sauna_slots = check_sauna_availability()
 
@@ -119,8 +138,8 @@ def get_all_available_activities():
 
     print()
 
-    # 5. Check Swimming
-    print("[5/6] Checking swimming availability...")
+    # 6. Check Swimming
+    print("[6/7] Checking swimming availability...")
     try:
         swimming = check_swimming_availability(days=3)
         if swimming['available'] and swimming.get('today'):
@@ -157,8 +176,8 @@ def get_all_available_activities():
 
     print()
 
-    # 6. Check Hiking
-    print("[6/6] Checking hiking options...")
+    # 7. Check Hiking
+    print("[7/7] Checking hiking options...")
     try:
         # This will print its own output
         # We'll just note that hiking info was checked
@@ -239,6 +258,7 @@ def main():
 
     print("\nTo log a completed activity:")
     print("  python log_activity.py run")
+    print("  python log_activity.py cycle")
     print("  python log_activity.py spin")
     print("  python log_activity.py sauna")
     print("  python log_activity.py climbing")
